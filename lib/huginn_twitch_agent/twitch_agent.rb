@@ -7,20 +7,19 @@ module Agents
 
     description do
       <<-MD
-      The Abuseipdb Agent allows you to utilize the AbuseIPDB API for creating report/check/etc actions.
+      The Twitch Agent is able to find information about users, checking live steam, others.
 
       `debug` is used for verbose mode.
 
       `user_id` is the id of the user.
 
+      `client_secret` is the secret of your app.
+
+      `access_token` is token created for your app.
+
+      `client_id` is the id of your app.
+
       `type` is for the wanted action like get_user_informations/active_streams.
-
-      `categories` is for the attack categories(At least one category is required).
-
-       If `emit_events` is set to `true`, the server response will be emitted as an Event. No data processing
-       will be attempted by this Agent, so the Event's "body" value will always be raw text.
-
-      `data` is the payload (https://docs.abuseipdb.com/#introduction).
 
       `expected_receive_period_in_days` is used to determine if the Agent is working. Set it to the maximum number of days
       that you anticipate passing without this Agent receiving an incoming Event.
