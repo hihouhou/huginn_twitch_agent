@@ -147,7 +147,13 @@ module Agents
       response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
         http.request(request)
       end
-      
+
+      if interpolated['debug'] == 'true'
+        log "response.body"
+        log response.body
+      end
+
+      log "request status : #{response.code}"
       payload = JSON.parse(response.body)
       if payload.to_s != memory['last_status']
         if "#{memory['last_status']}" == ''
