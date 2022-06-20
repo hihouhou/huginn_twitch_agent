@@ -7,7 +7,7 @@ module Agents
 
     description do
       <<-MD
-      The Twitch Agent is able to find information about users, checking live steam, others.
+      The Twitch Agent is able to find information about users, checking live stream, others.
 
       `debug` is used for verbose mode.
 
@@ -170,7 +170,7 @@ module Agents
               log stream
             end
             last_status['data'].each do |streambis|
-              if steam['started_at'] == streambis['started_at']
+              if stream['started_at'] == streambis['started_at']
                 found = true
               end
               if interpolated['debug'] == 'true'
