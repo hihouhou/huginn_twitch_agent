@@ -170,7 +170,7 @@ module Agents
               log stream
             end
             last_status['data'].each do |streambis|
-              if stream == streambis
+              if steam['started_at'] == streambis['started_at']
                 found = true
               end
               if interpolated['debug'] == 'true'
