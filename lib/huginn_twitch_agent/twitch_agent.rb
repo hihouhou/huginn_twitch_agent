@@ -194,23 +194,14 @@ module Agents
         http.request(request)
       end
 
-      if interpolated['debug'] == 'true'
-        log "response.body"
-        log response.body
-      end
+      log_curl_output(response.code,response.body)
 
-      log "request status : #{response.code}"
       payload = JSON.parse(response.body)
       if payload != memory['last_status']
-        if "#{memory['last_status']}" == ''
-          payload['data'].each do |stream|
-             log_curl_output(response.code,stream)
-          end
-        else
-          last_status = memory['last_status']
-          last_status = JSON.parse(last_status)
-          payload['data'].each do |stream|
-            found = false
+        payload['data'].each do |stream|
+          found = false
+          if !memory['last_status'].nil? and memory['last_status'].present?
+            last_status = memory['last_status']
             if interpolated['debug'] == 'true'
               log "stream"
               log stream
@@ -220,13 +211,17 @@ module Agents
                 found = true
               end
               if interpolated['debug'] == 'true'
+                log "found is #{found}!"
                 log "streambis"
                 log streambis
-                log "found is #{found}!"
               end
             end
-            if found == false
-              log_curl_output(response.code,stream)
+          end
+          if found == false
+            create_event payload: stream
+          else
+            if interpolated['debug'] == 'true'
+              log "found is #{found}"
             end
           end
         end
