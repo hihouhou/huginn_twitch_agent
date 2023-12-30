@@ -49,10 +49,10 @@ module Agents
 
     def default_options
       {
-        'client_id' => '',
         'user_id' => '',
-        'client_secret' => '',
-        'access_token' => '',
+        'client_id' => '{% credential twitch_client_id %}',
+        'client_secret' => '{% credential twitch_client_secret %}',
+        'access_token' => '{% credential twitch_access_token %}',
         'debug' => 'false',
         'emit_events' => 'false',
         'expected_receive_period_in_days' => '2',
@@ -118,6 +118,12 @@ module Agents
 
     private
 
+    def set_credential(name, value)
+      c = user.user_credentials.find_or_initialize_by(credential_name: name)
+      c.credential_value = value
+      c.save!
+    end
+
     def log_curl_output(code,body)
 
       log "request status : #{code}"
@@ -127,23 +133,63 @@ module Agents
         log body
       end
 
-      if interpolated['emit_events'] == 'true'
-        create_event payload: body
+    end
+
+    def token_refresh()
+
+      uri = URI.parse("https://id.twitch.tv/oauth2/token?&client_id=#{interpolated['client_id']}&client_secret=#{interpolated['client_secret']}&grant_type=client_credentials")
+      request = Net::HTTP::Post.new(uri)
+
+      req_options = {
+        use_ssl: uri.scheme == "https",
+      }
+
+      response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+        http.request(request)
       end
 
+      log_curl_output(response.code,response.body)
+
+      payload = JSON.parse(response.body)
+      if interpolated['access_token'] != payload['access_token']
+        set_credential("twitch_access_token", payload['access_token'])
+        if interpolated['debug'] == 'true'
+          log "twitch_access_token credential updated"
+        end
+      end
+      current_timestamp = Time.now.to_i
+      memory['expires_at'] = payload['expires_in'] + current_timestamp
+
+    end
+
+    def check_token_validity()
+
+      if memory['expires_at'].nil?
+        token_refresh()
+      else
+        timestamp_to_compare = memory['expires_at']
+        current_timestamp = Time.now.to_i
+        difference_in_hours = (timestamp_to_compare - current_timestamp) / 3600.0
+        if difference_in_hours < 2
+          token_refresh()
+        else
+          log "refresh not needed"
+        end
+      end
     end
 
     def active_streams()
 
+      check_token_validity()
       uri = URI.parse("https://api.twitch.tv/helix/streams?user_id=#{interpolated['user_id']}")
       request = Net::HTTP::Get.new(uri)
       request["Authorization"] = "Bearer #{interpolated['access_token']}"
       request["Client-Id"] = "#{interpolated['client_id']}"
-      
+
       req_options = {
         use_ssl: uri.scheme == "https",
       }
-      
+
       response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
         http.request(request)
       end
@@ -155,13 +201,13 @@ module Agents
 
       log "request status : #{response.code}"
       payload = JSON.parse(response.body)
-      if payload.to_s != memory['last_status']
+      if payload != memory['last_status']
         if "#{memory['last_status']}" == ''
           payload['data'].each do |stream|
              log_curl_output(response.code,stream)
           end
         else
-          last_status = memory['last_status'].gsub("=>", ": ").gsub(": nil,", ": null,")
+          last_status = memory['last_status']
           last_status = JSON.parse(last_status)
           payload['data'].each do |stream|
             found = false
@@ -184,12 +230,13 @@ module Agents
             end
           end
         end
-        memory['last_status'] = payload.to_s
+        memory['last_status'] = payload
       end
     end
 
     def get_user_informations()
-      
+
+      check_token_validity()
       uri = URI.parse("https://api.twitch.tv/helix/users?id=#{interpolated['user_id']}")
       request = Net::HTTP::Get.new(uri)
       request["Authorization"] = "Bearer #{interpolated['access_token']}"
@@ -198,13 +245,25 @@ module Agents
       req_options = {
         use_ssl: uri.scheme == "https",
       }
-      
+
       response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
         http.request(request)
       end
 
       log_curl_output(response.code,response.body)
 
+      payload = JSON.parse(response.body)
+
+      if payload != memory['last_status']
+        if interpolated['emit_events'] == 'true'
+          create_event payload: payload
+        end
+        memory['last_status'] = payload
+      else
+        if interpolated['debug'] == 'true'
+          log "no diff"
+        end
+      end
     end
 
     def trigger_action
